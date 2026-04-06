@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TopicTimer Tracker</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="container">
+    <header>
+      <h1>🍅 TopicTimer</h1>
+      <p>Track focused study sessions by subject</p>
+    </header>
+
+    <section class="setup">
+      <h2>1. Select or Add Subject</h2>
+      <div class="input-group">
+        <select id="topicSelect"><option value="">-- Choose a subject --</option></select>
+        <input type="text" id="newTopicInput" placeholder="Or add new...">
+        <button id="addTopicBtn" class="btn primary">+</button>
+      </div>
+    </section>
+
+    <section class="timer">
+      <h2>2. Start Focus Session</h2>
+      <div id="timerDisplay">25:00</div>
+      <div class="controls">
+        <button id="startBtn" class="btn primary">Start</button>
+        <button id="pauseBtn" class="btn secondary" disabled>Pause</button>
+        <button id="stopBtn" class="btn danger" disabled>Stop & Log</button>
+        <button id="resetBtn" class="btn outline">Reset</button>
+      </div>
+      <p id="statusText">Ready to focus</p>
+    </section>
+
+    <section class="history">
+      <h2>📊 Recent Sessions</h2>
+      <div id="chartContainer" style="display:none;">
+        <canvas id="weeklyChart"></canvas>
+      </div>
+      <table id="sessionTable">
+        <thead><tr><th>Subject</th><th>Date</th><th>Duration</th></tr></thead>
+        <tbody id="sessionBody"></tbody>
+      </table>
+      <button id="exportBtn" class="btn outline small">📥 Export CSV (V2)</button>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
