@@ -8,6 +8,7 @@ let isSaving = false;
 
 const els = {
   topicSelect: document.getElementById('topicSelect'),
+  deleteTopicBtn: document.getElementById('deleteTopicBtn'),
   timerDisplay: document.getElementById('timerDisplay'),
   startBtn: document.getElementById('startBtn'),
   pauseBtn: document.getElementById('pauseBtn'),
@@ -35,6 +36,22 @@ async function loadTopics() {
   els.topicSelect.innerHTML = '<option value="">-- Choose a subject --</option>' +
     topics.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
 }
+
+els.deleteTopicBtn.onclick = async () => {
+  const topicId = els.topicSelect.value;
+  if (!topicId) return alert('Select a subject first!');
+  const topicName = els.topicSelect.options[els.topicSelect.selectedIndex].text;
+  if (!confirm(`Delete "${topicName}" and all its sessions?`)) return;
+  try {
+    await fetch(`${API}/topics/${topicId}`, { method: 'DELETE' });
+    els.topicSelect.value = '';
+    await loadTopics();
+    await loadSessions();
+    await loadWeeklyStats();
+  } catch (err) {
+    alert('Failed to delete topic');
+  }
+};
 
 // --- Timer Display ---
 function updateDisplay(seconds) {

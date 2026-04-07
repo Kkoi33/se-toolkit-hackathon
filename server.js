@@ -34,6 +34,18 @@ app.post('/api/topics', async (req, res) => {
   }
 });
 
+// DELETE /api/topics/:id
+app.delete('/api/topics/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await dbRun('DELETE FROM sessions WHERE topic_id = ?', [id]);
+    await dbRun('DELETE FROM topics WHERE id = ?', [id]);
+    res.json({ message: 'Topic deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/sessions (V1 Core)
 app.post('/api/sessions', async (req, res) => {
   const { topic_id, start_time, duration_minutes } = req.body;
