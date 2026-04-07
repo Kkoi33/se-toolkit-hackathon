@@ -8,6 +8,8 @@ let isSaving = false;
 
 const els = {
   topicSelect: document.getElementById('topicSelect'),
+  newTopicInput: document.getElementById('newTopicInput'),
+  addTopicBtn: document.getElementById('addTopicBtn'),
   deleteTopicBtn: document.getElementById('deleteTopicBtn'),
   timerDisplay: document.getElementById('timerDisplay'),
   startBtn: document.getElementById('startBtn'),
@@ -36,6 +38,26 @@ async function loadTopics() {
   els.topicSelect.innerHTML = '<option value="">-- Choose a subject --</option>' +
     topics.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
 }
+
+els.addTopicBtn.onclick = async () => {
+  const name = els.newTopicInput.value.trim();
+  if (name.length < 2) return alert('Subject name must be at least 2 characters');
+  const res = await fetch(`${API}/topics`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ name })
+  });
+  if (res.ok) {
+    els.newTopicInput.value = '';
+    await loadTopics();
+  } else {
+    alert('Subject already exists');
+  }
+};
+
+els.newTopicInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') els.addTopicBtn.click();
+});
 
 els.deleteTopicBtn.onclick = async () => {
   const topicId = els.topicSelect.value;
