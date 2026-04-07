@@ -1,8 +1,10 @@
 const API = '/api';
+
 let timerInterval = null;
-let startTime = null;
 let elapsed = 0;
+let isRunning = false;
 let isPaused = false;
+let isSaving = false;
 
 const els = {
   topicSelect: document.getElementById('topicSelect'),
@@ -25,6 +27,7 @@ async function init() {
   await loadTopics();
   await loadSessions();
   await loadWeeklyStats();
+  updateButtons();
 }
 
 // --- Topics ---
@@ -38,62 +41,98 @@ async function loadTopics() {
 els.addTopicBtn.onclick = async () => {
   const name = els.newTopicInput.value.trim();
   if (!name) return;
-  const res = await fetch(`${API}/topics`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name}) });
-  if (res.ok) { els.newTopicInput.value = ''; await loadTopics(); }
-  else alert('Failed to add topic');
+  const res = await fetch(`${API}/topics`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ name })
+  });
+  if (res.ok) {
+    els.newTopicInput.value = '';
+    await loadTopics();
+  } else {
+    alert('Failed to add topic (may already exist)');
+  }
 };
 
-// --- Timer Logic ---
+// --- Timer Display ---
 function updateDisplay(seconds) {
   const m = Math.floor(seconds / 60).toString().padStart(2, '0');
   const s = (seconds % 60).toString().padStart(2, '0');
   els.timerDisplay.textContent = `${m}:${s}`;
 }
 
+// --- Button States ---
+function updateButtons() {
+  els.startBtn.disabled = isRunning || isPaused || isSaving;
+  els.pauseBtn.disabled = (!isRunning && !isPaused) || isSaving;
+  els.stopBtn.disabled = (!isRunning && !isPaused) || isSaving;
+  els.resetBtn.disabled = (!isRunning && !isPaused) || isSaving;
+
+  if (isPaused) {
+    els.pauseBtn.textContent = 'Resume';
+  } else {
+    els.pauseBtn.textContent = 'Pause';
+  }
+}
+
+// --- Start ---
 els.startBtn.onclick = () => {
   if (!els.topicSelect.value) return alert('Select a subject first!');
-  if (timerInterval) return;
-  startTime = Date.now() - (elapsed * 1000);
+  if (isRunning || isPaused) return;
+
+  isRunning = true;
+  isPaused = false;
+  elapsed = 0;
   els.statusText.textContent = '🔥 Focusing...';
-  toggleBtns(false, false, false, false);
+
   timerInterval = setInterval(() => {
-    elapsed = Math.floor((Date.now() - startTime) / 1000);
+    elapsed++;
     updateDisplay(elapsed);
   }, 1000);
+
+  updateButtons();
 };
 
+// --- Pause / Resume ---
 els.pauseBtn.onclick = () => {
-  if (!timerInterval && !isPaused) return;
   if (isPaused) {
-    startTime = Date.now() - (elapsed * 1000);
-    els.statusText.textContent = '🔥 Focusing...';
+    // Resume
     isPaused = false;
-    els.pauseBtn.textContent = 'Pause';
-    toggleBtns(false, false, false, false);
+    isRunning = true;
+    els.statusText.textContent = '🔥 Focusing...';
+
     timerInterval = setInterval(() => {
-      elapsed = Math.floor((Date.now() - startTime) / 1000);
+      elapsed++;
       updateDisplay(elapsed);
     }, 1000);
   } else {
+    // Pause
     clearInterval(timerInterval);
     timerInterval = null;
-    els.statusText.textContent = '⏸️ Paused';
+    isRunning = false;
     isPaused = true;
-    els.pauseBtn.textContent = 'Resume';
-    toggleBtns(false, false, false, false);
+    els.statusText.textContent = '⏸️ Paused';
   }
+  updateButtons();
 };
 
+// --- Stop & Log ---
 els.stopBtn.onclick = async () => {
+  if (isSaving) return;
+
   clearInterval(timerInterval);
   timerInterval = null;
+  isRunning = false;
   isPaused = false;
+  isSaving = true;
+  updateButtons();
 
-  const minutes = Math.max(1, Math.round(elapsed / 60));
+  const minutes = Math.max(1, Math.ceil(elapsed / 60));
+
   try {
     const res = await fetch(`${API}/sessions`, {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         topic_id: els.topicSelect.value,
         start_time: new Date().toISOString(),
@@ -112,73 +151,92 @@ els.stopBtn.onclick = async () => {
   } catch (err) {
     els.statusText.textContent = '❌ Network error';
   }
-  resetTimer();
+
+  isSaving = false;
+  elapsed = 0;
+  updateDisplay(25 * 60);
+  els.statusText.textContent = isSaving ? 'Saving...' : 'Ready to focus';
+  updateButtons();
 };
 
+// --- Reset ---
 els.resetBtn.onclick = () => {
   clearInterval(timerInterval);
   timerInterval = null;
+  isRunning = false;
   isPaused = false;
-  resetTimer();
-};
-
-function resetTimer() {
-  elapsed = 0; isPaused = false; startTime = null;
+  elapsed = 0;
   updateDisplay(25 * 60);
   els.statusText.textContent = 'Ready to focus';
-  toggleBtns(true, false, false, true);
-  els.pauseBtn.textContent = 'Pause';
-}
+  updateButtons();
+};
 
-function toggleBtns(start, pause, stop, reset) {
-  els.startBtn.disabled = start;
-  els.pauseBtn.disabled = pause;
-  els.stopBtn.disabled = stop;
-  els.resetBtn.disabled = reset;
-}
-
-// --- Sessions & Chart (V2) ---
+// --- Load Sessions ---
 async function loadSessions() {
-  const res = await fetch(`${API}/sessions?limit=10`);
-  const sessions = await res.json();
-  els.sessionBody.innerHTML = sessions.map(s => `
-    <tr>
-      <td>${s.topic_name}</td>
-      <td>${new Date(s.created_at).toLocaleDateString()}</td>
-      <td>${s.duration_minutes} min</td>
-    </tr>
-  `).join('');
+  try {
+    const res = await fetch(`${API}/sessions?limit=10`);
+    const sessions = await res.json();
+    els.sessionBody.innerHTML = sessions.map(s => `
+      <tr>
+        <td>${s.topic_name}</td>
+        <td>${new Date(s.created_at).toLocaleDateString()}</td>
+        <td>${s.duration_minutes} min</td>
+      </tr>
+    `).join('') || '<tr><td colspan="3" style="color:#94a3b8">No sessions yet. Start one!</td></tr>';
+  } catch (err) {
+    console.error('Failed to load sessions:', err);
+  }
 }
 
+// --- Load Weekly Stats ---
 async function loadWeeklyStats() {
-  const res = await fetch(`${API}/stats/weekly`);
-  const stats = await res.json();
-  if (!stats.length) { els.chartContainer.style.display = 'none'; return; }
-  
-  els.chartContainer.style.display = 'block';
-  if (els.weeklyChart) els.weeklyChart.destroy();
-  
-  els.weeklyChart = new Chart(document.getElementById('weeklyChart'), {
-    type: 'bar',
-    data: {
-      labels: stats.map(s => s.topic),
-      datasets: [{ label: 'Minutes (Last 7 Days)', data: stats.map(s => s.total_minutes), backgroundColor: '#2563eb' }]
-    },
-    options: { responsive: true, plugins: { legend: { display: false } } }
-  });
+  try {
+    const res = await fetch(`${API}/stats/weekly`);
+    const stats = await res.json();
+    if (!stats.length) { els.chartContainer.style.display = 'none'; return; }
+
+    els.chartContainer.style.display = 'block';
+    if (els.weeklyChart) els.weeklyChart.destroy();
+
+    els.weeklyChart = new Chart(document.getElementById('weeklyChart'), {
+      type: 'bar',
+      data: {
+        labels: stats.map(s => s.topic),
+        datasets: [{
+          label: 'Minutes (Last 7 Days)',
+          data: stats.map(s => s.total_minutes),
+          backgroundColor: '#2563eb'
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } }
+      }
+    });
+  } catch (err) {
+    console.error('Failed to load weekly stats:', err);
+  }
 }
 
-// --- CSV Export (V2) ---
+// --- CSV Export ---
 els.exportBtn.onclick = async () => {
-  const res = await fetch(`${API}/sessions?limit=500`);
-  const sessions = await res.json();
-  let csv = 'Subject,Date,Duration(min)\n';
-  sessions.forEach(s => {
-    csv += `"${s.topic_name}","${new Date(s.created_at).toLocaleDateString()}",${s.duration_minutes}\n`;
-  });
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = 'study_sessions.csv'; a.click();
+  try {
+    const res = await fetch(`${API}/sessions?limit=500`);
+    const sessions = await res.json();
+    let csv = 'Subject,Date,Duration(min)\n';
+    sessions.forEach(s => {
+      csv += `"${s.topic_name}","${new Date(s.created_at).toLocaleDateString()}",${s.duration_minutes}\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'study_sessions.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error('Failed to export CSV:', err);
+  }
 };
 
 init();
