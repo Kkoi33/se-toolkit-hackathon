@@ -22,13 +22,16 @@ const dbGet = (sql, params) => new Promise((resolve, reject) => {
 db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS topics (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT UNIQUE NOT NULL
+    name TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    UNIQUE(name, user_id)
   )`, (err) => { if (err) console.error('Error creating topics table:', err.message); });
   db.run(`CREATE TABLE IF NOT EXISTS sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     topic_id INTEGER NOT NULL,
     start_time TEXT NOT NULL,
     duration_minutes INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(topic_id) REFERENCES topics(id)
   )`, (err) => { if (err) console.error('Error creating sessions table:', err.message); });

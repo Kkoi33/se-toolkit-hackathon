@@ -1,10 +1,27 @@
 const API = '/api';
+let USER_ID = localStorage.getItem('user_id');
 
 let timerInterval = null;
 let elapsed = 0;
 let isRunning = false;
 let isPaused = false;
 let isSaving = false;
+
+async function ensureUserId() {
+  if (!USER_ID) {
+    const res = await fetch(`${API}/user/id`);
+    const data = await res.json();
+    USER_ID = data.user_id;
+    localStorage.setItem('user_id', USER_ID);
+  }
+  return USER_ID;
+}
+
+function authFetch(url, options = {}) {
+  options.headers = options.headers || {};
+  options.headers['x-user-id'] = USER_ID;
+  return fetch(url, options);
+}
 
 const els = {
   topicSelect: document.getElementById('topicSelect'),
@@ -25,6 +42,7 @@ const els = {
 
 // --- Init ---
 async function init() {
+  await ensureUserId();
   await loadTopics();
   await loadSessions();
   await loadWeeklyStats();
@@ -33,7 +51,8 @@ async function init() {
 
 // --- Topics ---
 async function loadTopics() {
-  const res = await fetch(`${API}/topics`);
+  await ensureUserId();
+  const res = await authFetch(`${API}/topics`);
   const topics = await res.json();
   els.topicSelect.innerHTML = '<option value="">-- Choose a subject --</option>' +
     topics.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
@@ -42,7 +61,8 @@ async function loadTopics() {
 els.addTopicBtn.onclick = async () => {
   const name = els.newTopicInput.value.trim();
   if (name.length < 2) return alert('Subject name must be at least 2 characters');
-  const res = await fetch(`${API}/topics`, {
+  await ensureUserId();
+  const res = await authFetch(`${API}/topics`, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({ name })
@@ -64,8 +84,9 @@ els.deleteTopicBtn.onclick = async () => {
   if (!topicId) return alert('Select a subject first!');
   const topicName = els.topicSelect.options[els.topicSelect.selectedIndex].text;
   if (!confirm(`Delete "${topicName}" and all its sessions?`)) return;
+  await ensureUserId();
   try {
-    await fetch(`${API}/topics/${topicId}`, { method: 'DELETE' });
+    await authFetch(`${API}/topics/${topicId}`, { method: 'DELETE' });
     els.topicSelect.value = '';
     await loadTopics();
     await loadSessions();
@@ -151,7 +172,8 @@ els.stopBtn.onclick = async () => {
   const minutes = Math.max(1, Math.ceil(elapsed / 60));
 
   try {
-    const res = await fetch(`${API}/sessions`, {
+    await ensureUserId();
+    const res = await authFetch(`${API}/sessions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -195,7 +217,8 @@ els.resetBtn.onclick = () => {
 // --- Load Sessions ---
 async function loadSessions() {
   try {
-    const res = await fetch(`${API}/sessions?limit=10`);
+    await ensureUserId();
+    const res = await authFetch(`${API}/sessions?limit=10`);
     const sessions = await res.json();
     els.sessionBody.innerHTML = sessions.map(s => `
       <tr>
@@ -212,7 +235,8 @@ async function loadSessions() {
 // --- Load Weekly Stats ---
 async function loadWeeklyStats() {
   try {
-    const res = await fetch(`${API}/stats/weekly`);
+    await ensureUserId();
+    const res = await authFetch(`${API}/stats/weekly`);
     const stats = await res.json();
     if (!stats.length) { els.chartContainer.style.display = 'none'; return; }
 
@@ -242,7 +266,8 @@ async function loadWeeklyStats() {
 // --- CSV Export ---
 els.exportBtn.onclick = async () => {
   try {
-    const res = await fetch(`${API}/sessions?limit=500`);
+    await ensureUserId();
+    const res = await authFetch(`${API}/sessions?limit=500`);
     const sessions = await res.json();
     let csv = 'Subject,Date,Duration(min)\n';
     sessions.forEach(s => {
