@@ -8,8 +8,6 @@ let isSaving = false;
 
 const els = {
   topicSelect: document.getElementById('topicSelect'),
-  newTopicInput: document.getElementById('newTopicInput'),
-  addTopicBtn: document.getElementById('addTopicBtn'),
   timerDisplay: document.getElementById('timerDisplay'),
   startBtn: document.getElementById('startBtn'),
   pauseBtn: document.getElementById('pauseBtn'),
@@ -37,22 +35,6 @@ async function loadTopics() {
   els.topicSelect.innerHTML = '<option value="">-- Choose a subject --</option>' +
     topics.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
 }
-
-els.addTopicBtn.onclick = async () => {
-  const name = els.newTopicInput.value.trim();
-  if (!name) return;
-  const res = await fetch(`${API}/topics`, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ name })
-  });
-  if (res.ok) {
-    els.newTopicInput.value = '';
-    await loadTopics();
-  } else {
-    alert('Failed to add topic (may already exist)');
-  }
-};
 
 // --- Timer Display ---
 function updateDisplay(seconds) {
