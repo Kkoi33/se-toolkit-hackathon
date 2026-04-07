@@ -88,14 +88,8 @@ els.stopBtn.onclick = async () => {
   clearInterval(timerInterval);
   timerInterval = null;
   isPaused = false;
-  if (elapsed < 60) {
-    els.statusText.textContent = '⚠️ Session too short (min 1 min)';
-    setTimeout(() => { els.statusText.textContent = 'Ready to focus'; }, 2000);
-    resetTimer();
-    return;
-  }
 
-  const minutes = Math.round(elapsed / 60);
+  const minutes = Math.max(1, Math.round(elapsed / 60));
   try {
     const res = await fetch(`${API}/sessions`, {
       method: 'POST',
